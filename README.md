@@ -1,0 +1,2 @@
+# spatiotemporal_diarylquinolines
+Spatiotemporal population models for diarylquinolines
