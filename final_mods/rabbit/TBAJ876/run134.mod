@@ -1,0 +1,91 @@
+;; 1. Based on: 121
+;; x1. Author: aebustion
+$PROBLEM    rabbit plasma PK
+$INPUT      ID OLDID=DROP WT DAT2=DROP TIME EVID DOSE_MGKG AMT TAD DV
+            NGML CMPD STUDY=DROP CMT BLQ DV_ZERO
+$DATA      all_TBAJ-876_plasma_studies_wCMT_BLQ_M3.csv IGNORE=@
+            IGNORE(ID.LT.12) IGNORE(BLQ.EQ.1)
+$SUBROUTINE ADVAN6 TOL=5
+$MODEL      NCOMP=6 COMP=(ABS,DEFDOSE) COMP=(CENTRAL,DEFOBS)
+            COMP=(PERIPH) COMP(CMPD) COMP(TRANSIT1) COMP(TRANSIT2)
+$PK       
+CL = THETA(3)*EXP(ETA(1))
+V  = THETA(4)*EXP(ETA(2))
+KE = CL/V
+KA = THETA(5)*EXP(ETA(3))
+V2 = THETA(6)
+Q = THETA(7)
+K12 = Q/V
+K21 = Q/V2
+Fm = 1
+S2=V
+
+KM   = THETA(8)
+VMAX = KM*CL
+
+TVCLm=THETA(9)
+CLm=TVCLm*EXP(ETA(4))
+
+TVVm=THETA(10)
+Vm=TVVm*EXP(ETA(5))
+
+;TRANSIT MODEL PARAMETER
+MTT =THETA(13)*EXP(ETA(6))
+N=2
+KTR=N/MTT; transit rate constant
+
+$DES  
+DADT(1)= -KTR*A(1)
+DADT(2)=A(6)*KA-(VMAX*A(2)/V)/(KM+A(2)/V)-A(2)*K12+A(3)*K21
+DADT(3)=A(2)*K12-A(3)*K21
+DADT(4) = Fm*(CL/V)*A(2) - (CLm/Vm)*A(4) 
+DADT(5)=KTR*A(1)-KTR*A(5)
+DADT(6)=KTR*A(5)-KA*A(6) 
+
+$ERROR  
+CP = A(2)/V
+CM = A(4)/Vm      
+IF(CMT.EQ.2) IPRED=A(2)/V
+IF(CMT.EQ.4) IPRED=A(4)/Vm
+
+PROPm=THETA(11) ; Prop metabolite
+ADDm=THETA(12)  ; add metabolite
+WA=THETA(2) ; additive error
+WP=THETA(1) ; proportional error
+
+IF(CMT.EQ.2) W = SQRT(WA**2+(WP*IPRED)**2)
+IF(CMT.EQ.4) W = SQRT(ADDm**2+PROPm**2*IPRED**2)
+IF(W.EQ.0) W = 1
+
+IRES=DV-IPRED 
+IWRES=IRES/W 
+Y = IPRED + W*EPS(1)        
+
+$THETA  (0,0.520144) ; 1 Prop error
+ (0,5E-05) FIX ; 2 Add error Error.
+ (0,37.8745) ; 3 CL L/h
+ (0,186.01) ; 4 V L
+ (0,0.786354,65) ; 5 KA 1/h
+ (0,1363) ; V2
+ (0,42.1526) ; Q
+ (0,0.186557) ; KM
+ (0,60.2439) ; 6 CLm
+ (0,593.81) ; 7 Vm
+ (0,0.200932) ; PROPm
+ 0 FIX ; ADDm
+ (0,1.27175) ; MTT
+;(0,0.367475,1) ; Fm
+$OMEGA  0.0929047  ;     CL IIV
+ 0  FIX  ;      V IIV
+ 0  FIX  ;     KA IIV
+ 0.125286  ;    CLm IIV
+ 0  FIX  ;     Vm IIV
+ 0  FIX
+$SIGMA  1  FIX  ; eps residual variance
+$ESTIMATION METHOD=1 INTERACTION PRINT=5 SIG=3 MAXEVAL=9999 NOABORT
+$COVARIANCE UNCONDITIONAL
+$TABLE      ID TIME IPRED PRED DV AMT WRES IWRES CWRES EVID TAD CMPD
+            CP CM CMT NOPRINT ONEHEADER FILE=sdtab134
+$TABLE      ID CL V KA KE CLm Vm NOPRINT ONEHEADER FILE=patab134
+$TABLE      ID WT NOPRINT ONEHEADER FILE=cotab134
+
